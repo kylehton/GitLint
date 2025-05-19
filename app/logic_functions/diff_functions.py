@@ -1,4 +1,4 @@
-from s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id
+from logic_functions.s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id
 
 from pinecone import Pinecone
 from openai import OpenAI
