@@ -9,7 +9,7 @@ import logging
 import re
 import json
 import boto3
-from s3chunks import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id
+from s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

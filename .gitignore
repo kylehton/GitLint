@@ -14,3 +14,4 @@ pinecone.py
 
 app/embedded_hashes.json
 viewEmbeddings.py
+chunk_s3.json
