@@ -7,8 +7,10 @@ import httpx
 import asyncio
 import logging
 import re
+import json
+import boto3
+from s3chunks import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -16,8 +18,12 @@ dotenv.load_dotenv()
 
 openAIClient = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 githubKey = os.getenv("GITHUB_ACCESS_TOKEN")
-
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+
+S3_BUCKET = os.getenv("S3_BUCKET_NAME")
+S3_OBJECT_KEY = "chunk_s3.json"
+s3 = boto3.client("s3")
+
 index = pc.Index("git-lint")
 
 systemPrompt = """
@@ -43,9 +49,10 @@ systemPrompt = """
     """
 
 app = FastAPI()
-
-# Store background tasks to prevent garbage collection
 background_tasks_set = set()
+
+store_path = download_chunk_store_from_s3()
+chunk_store = load_chunk_store(store_path)
 
 def chunk_diff(diff: str, min_len: int = 50):
 
@@ -97,8 +104,9 @@ async def get_diff(url: str):
             return response.text
         else:
             return {"error": "Failed to get pull request diff"}
-        
+
 async def retrieve_context_from_diff(diff: str, top_k: int = 3):
+
     chunks = chunk_diff(diff)
     all_matches = []
 
@@ -115,13 +123,18 @@ async def retrieve_context_from_diff(diff: str, top_k: int = 3):
             include_metadata=True
         )
 
-        top_matches = result.get("matches", [])
-        for match in top_matches:
-            preview = match["metadata"].get("preview", "")
-            logger.info(f"Preview: {preview}")
-            all_matches.append(preview)
+        for match in result.get("matches", []):
+            chunk_id = match["id"]
+            full_chunk = get_full_chunk_by_id(chunk_id, chunk_store)
 
-    return "\n\n".join(all_matches[:5])
+            if full_chunk:
+                logger.info(f"✅ Context match from {match['metadata']['path']} (chunk {match['metadata']['chunk_id']})")
+                all_matches.append(full_chunk)
+            else:
+                logger.warning(f"⚠️ Chunk ID {chunk_id} not found in chunk store")
+
+    return "\n\n".join(all_matches[:5]) 
+
 
 @app.on_event("shutdown")
 async def shutdown_event():

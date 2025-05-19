@@ -1,6 +1,6 @@
 # THIS FILE IS MEANT TO CREATE INITIAL EMBEDDINGS FOR THE REPOSITORIES THAT ARE WATCHED BY THE GIT LINT SERVICE
 # IT IS MEANT TO BE RUN ONCE AND THEN THE EMBEDDINGS WILL BE STORED IN PINECONE
-
+from s3chunks import save_chunk_store_locally, upload_chunk_store_to_s3
 import os
 import re
 import json
@@ -150,3 +150,9 @@ if __name__ == "__main__":
     new_hash_cache = {chunk["metadata"]["hash"]: True for chunk in embedded_chunks}
     new_hash_cache.update(load_hash_cache())
     save_hash_cache(new_hash_cache)
+
+
+    # After upsert
+    save_chunk_store_locally(embedded_chunks)
+    upload_chunk_store_to_s3()
+
