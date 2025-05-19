@@ -1,7 +1,11 @@
 import os
 import json
 import boto3
+import dotenv
+
 from pathlib import Path
+
+dotenv.load_dotenv()
 
 CHUNK_STORE_FILE = "chunk_s3.json"
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
@@ -37,12 +41,12 @@ def upload_chunk_store_to_s3():
 # Download & Load in FastAPI
 # ---------------------------
 
-def download_chunk_store_from_s3(dest_path="/temp/chunk_store.json"):
+def download_chunk_store_from_s3(dest_path="/tmp/chunk_store.json"):
     s3.download_file(S3_BUCKET, S3_OBJECT_KEY, dest_path)
     print(f"✅ Downloaded chunk store to {dest_path}")
     return dest_path
 
-def load_chunk_store(path="/temp/chunk_store.json"):
+def load_chunk_store(path="/tmp/chunk_store.json"):
     with open(path) as f:
         return json.load(f)
 
