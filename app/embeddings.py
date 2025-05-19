@@ -70,7 +70,8 @@ def chunk_code_files(repo_path: str, verbose=True):
                             "metadata": {
                                 "path": str(file_path),
                                 "chunk_id": i,
-                                "hash": content_hash
+                                "hash": content_hash,
+                                "preview": cleaned[:200]
                             }
                         })
 

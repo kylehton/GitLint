@@ -61,8 +61,8 @@ def chunk_diff(diff: str, min_len: int = 50):
 async def review_diff(diff: str):
     try:
         context = await retrieve_context_from_diff(diff)
-        prompt = f"{systemPrompt}\n\nContext:\n{context}\n\nDiff:\n{diff}"
-        logger.info(f"Prompt: {prompt}")
+        logger.info(f"Context: {context}")
+        prompt = f"{systemPrompt}\n\nContext from codebase:\n{context}\n\nDiff:\n{diff}"
         response = openAIClient.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -118,9 +118,10 @@ async def retrieve_context_from_diff(diff: str, top_k: int = 3):
         top_matches = result.get("matches", [])
         for match in top_matches:
             preview = match["metadata"].get("preview", "")
+            logger.info(f"Preview: {preview}")
             all_matches.append(preview)
 
-    return "\n\n".join(all_matches[:3])
+    return "\n\n".join(all_matches[:5])
 
 @app.on_event("shutdown")
 async def shutdown_event():
