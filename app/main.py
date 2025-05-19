@@ -174,9 +174,7 @@ async def process_review(repo_name: str, diff_url: str, issue_url: str):
         logger.error(f"[ERROR]: {e}")
     
 @app.post("/review")
-async def webhook(request: Request, background_tasks: BackgroundTasks):
-    full_repo = data["repository"]["full_name"]  
-    repo_name = full_repo.split("/")[-1]  
+async def webhook(request: Request, background_tasks: BackgroundTasks): 
 
     logger.info("[/review] Request received")
 
@@ -185,11 +183,13 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
         return {"message": "Ping received!"}
     elif request.headers.get("X-GitHub-Event") == "pull_request":
         data = await request.json()
+
+        full_repo = data["repository"]["full_name"]  
+        repo_name = full_repo.split("/")[-1] 
         diff_url = data["pull_request"]["diff_url"]
         issue_url = data["pull_request"]["issue_url"]
         
         background_tasks.add_task(process_review, repo_name, diff_url, issue_url)
-        
         logger.info("[/review] Responding immediately")
         
         return {"message": "Review started, response will be posted shortly."}
