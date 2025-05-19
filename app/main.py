@@ -65,9 +65,9 @@ def chunk_diff(diff: str, min_len: int = 50):
             chunks.append(cleaned)
     return chunks
 
-async def review_diff(diff: str):
+async def review_diff(repo_name: str, diff: str):
     try:
-        context = await retrieve_context_from_diff(diff)
+        context = await retrieve_context_from_diff(repo_name, diff)
         logger.info(f"Context: {context}")
         prompt = f"{systemPrompt}\n\nContext from codebase:\n{context}\n\nDiff:\n{diff}"
         response = openAIClient.chat.completions.create(
