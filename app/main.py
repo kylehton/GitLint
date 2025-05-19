@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Request, BackgroundTasks
+from pinecone import Pinecone
 from openai import OpenAI
 import os
 import dotenv
 import httpx
 import asyncio
 import logging
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +16,9 @@ dotenv.load_dotenv()
 
 openAIClient = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 githubKey = os.getenv("GITHUB_ACCESS_TOKEN")
+
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index = pc.Index("git-lint")
 
 systemPrompt = """
     The input is the raw diff of a pull request. You are a meticulous code reviewer with deep expertise in algorithms, 
@@ -42,12 +47,26 @@ app = FastAPI()
 # Store background tasks to prevent garbage collection
 background_tasks_set = set()
 
+def chunk_diff(diff: str, min_len: int = 50):
+
+    chunks = []
+    raw_chunks = re.split(r"^diff --git.+?^(@@.+?@@)", diff, flags=re.MULTILINE | re.DOTALL)
+
+    for chunk in raw_chunks:
+        cleaned = chunk.strip()
+        if len(cleaned) >= min_len:
+            chunks.append(cleaned)
+    return chunks
+
 async def review_diff(diff: str):
     try:
+        context = await retrieve_context_from_diff(diff)
+        prompt = f"{systemPrompt}\n\nContext:\n{context}\n\nDiff:\n{diff}"
+        logger.info(f"Prompt: {prompt}")
         response = openAIClient.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": systemPrompt},
+                {"role": "system", "content": prompt},
                 {"role": "user", "content": diff}
             ]
         )
@@ -78,6 +97,30 @@ async def get_diff(url: str):
             return response.text
         else:
             return {"error": "Failed to get pull request diff"}
+        
+async def retrieve_context_from_diff(diff: str, top_k: int = 3):
+    chunks = chunk_diff(diff)
+    all_matches = []
+
+    for chunk in chunks:
+        response = openAIClient.embeddings.create(
+            input=chunk,
+            model="text-embedding-3-small"
+        )
+        vector = response.data[0].embedding
+
+        result = index.query(
+            vector=vector,
+            top_k=top_k,
+            include_metadata=True
+        )
+
+        top_matches = result.get("matches", [])
+        for match in top_matches:
+            preview = match["metadata"].get("preview", "")
+            all_matches.append(preview)
+
+    return "\n\n".join(all_matches[:3])
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -91,7 +134,7 @@ async def shutdown_event():
 
 @app.get("/")
 def read_root():
-    logger.info("Service is running successfully through EC2.")
+    logger.info("Service is running successfully through EC2 instance of Docker container.")
     return {"Status": "200 OK"}
 
 # Process function for review endpoint
@@ -129,11 +172,6 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
         
         background_tasks.add_task(process_review, diff_url, issue_url)
         
-        '''
-        task = asyncio.create_task(process_review(diff_url, issue_url))
-        background_tasks_set.add(task)
-        task.add_done_callback(lambda t: background_tasks_set.remove(t))
-        '''
         logger.info("[/review] Responding immediately")
         
         return {"message": "Review started, response will be posted shortly."}

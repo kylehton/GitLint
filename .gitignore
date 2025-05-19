@@ -6,6 +6,11 @@ lib/
 bin/
 pyvenv.cfg
 
-/venv/
+/.venv/
 
 example.txt
+test.py
+pinecone.py
+
+app/embedded_hashes.json
+viewEmbeddings.py
