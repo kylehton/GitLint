@@ -33,47 +33,67 @@ systemPrompt = """
     IMPORTANT: Please keep all text, analysis and comments, non-verbose, making sure to be concise and to the point, 
     especially for non-impactful changes in the diff.
     Your job:
-    Identify every single change, no matter how small (e.g., comment removal, spacing, refactoring).
-    Some lines are going to be low impact changes, such as spacing, formatting, comment removal, etc.
-    These should NOT be analyzed heavily, and only briefly mentioned at the bottom of the review, before the summary.
-    For each impactful changed line, analyze and explain, consolidating analysis where you can, and only mentioning the most impactful changes:
-    What was changed.
-    Why it was changed (or likely changed).
-    Whether the change improves or worsens the code.
-    If further improvements or abstractions can be made (e.g., avoid repetition, wasted memory, lack of modularity).
-    If no code change is necessary, but improvements are possible (e.g., abstraction opportunities), suggest those.
-    Return only the changed lines with explanations — no restating of diffs or unchanged code.
-    Do not return code in diff format. Use a human-readable explanation paired directly with the changed lines.
-    Your review should help turn the code into the most scalable, efficient, and readable version possible. Assume the 
-    author wants direct, precise, and actionable feedback with no fluff. Do not summarize at the start — only provide a 
-    detailed final summary at the end of the changes.
+        Identify every single change, no matter how small (e.g., comment removal, spacing, refactoring).
+        Some lines are going to be low impact changes, such as spacing, formatting, comment removal, etc.
+        These should NOT be analyzed heavily, and only briefly mentioned at the bottom of the review, before the summary.
+        Impactful changes are: changes to logic and functionality, adding or removing features, and those types of changes
+        that have a significant impact on the codebase and how it functions.
+        For each impactful changed line, analyze and explain, consolidating analysis where you can, and only mentioning the most 
+        impactful changes:
+            - What was changed.
+            - Why it was changed (or likely changed).
+            - Whether the change improves or worsens the code.
+            - If further improvements or abstractions can be made (e.g., avoid repetition, wasted memory, lack of modularity).
+            - If no code change is necessary, but improvements are possible (e.g., abstraction opportunities), suggest those.
+            - Return only the changed lines with explanations — no restating of diffs or unchanged code.
+            - Do not return code in diff format. Use a human-readable explanation paired directly with the changed lines.
+        Your review should help turn the code into the most scalable, efficient, and readable version possible. Assume the 
+        author wants direct, precise, and actionable feedback with no fluff. Do not summarize at the start — only provide a 
+        detailed final summary at the end of the changes.
     """
 
-### FUNCTIONS ###
+##### FUNCTIONS (are written in order they are called in function pipeline) #####
 
-# Process function for review endpoint
+### CALLED BY: main.py
+### PURPOSE: Handles function chain to process a pull request diff and generate a review comment
+# 1. Retrieve the diff from the redirect URL
+# 2. Review the diff and create a comment
+# 3. Post the comment to the issue
+# @param repo_name: str - The name of the repository
+# @param diff_url: str - The URL of the diff
+# @param issue_url: str - The URL of the issue
+# @return: None
 async def process_review(repo_name: str, diff_url: str, issue_url: str):
     try:
         logger.info("[PROCESS]: Retrieving diff from redirect URL")
+        # 1. Retrieve the diff from the redirect URL
         diff = await get_diff(diff_url)
         if isinstance(diff, dict) and diff.get("error"):
             logger.error(f"Error getting diff: {diff['error']}")
             return
 
         logger.info("[PROCESS]: Reviewing diff and creating comment")
+        # 2. Review the diff and create a comment
         review = await review_diff(repo_name, diff)
         if isinstance(review, dict) and review.get("error"):
             logger.error(f"Error reviewing diff: {review['error']}")
             return
 
         logger.info("[PROCESS]: Posting comment")
+        # 3. Post the comment to the issue
         response = await post_comment(issue_url, review)
         logger.info(f"Comment response: {response}")
     except Exception as e:
         logger.error(f"[ERROR]: {e}")
 
 
-async def get_diff(url: str):
+### CALLED BY: process_review
+### PURPOSE: Retrieves the diff from the redirect URL to be used as the input for the review
+# 1. Retrieve the diff from the redirect URL
+# 2. Return the diff in text/string format
+# @param url: str - The URL of the diff
+# @return: str - The diff as text
+async def get_diff(url: str) -> str:
     async with httpx.AsyncClient(follow_redirects=True) as client:
         response = await client.get(url)
         # Code 200 -> Success, 302 -> Redirect
@@ -83,10 +103,21 @@ async def get_diff(url: str):
             return {"error": "Failed to get pull request diff"}
 
 
-async def review_diff(repo_name: str, diff: str):
+### CALLED BY: process_review
+### PURPOSE: Calls gpt-4o-mini to generate a code review comment based on the prompt, diff, and the codebase context
+# 1. Retrieve the context from the diff
+# 2. Call gpt-4o-mini to generate a code review comment
+# 3. Return the code review comment
+# @param repo_name: str - The name of the repository to be searched for context
+# @param diff: str - The diff of the pull request
+# @return: str - code review comment generated by LLM
+async def review_diff(repo_name: str, diff: str) -> str:
     try:
+        # 1. Retrieve the context from the diff
         context = await retrieve_context_from_diff(repo_name, diff)
         logger.info(f"Context: {context}")
+
+        # 2. Call gpt-4o-mini to generate a code review comment
         prompt = f"{systemPrompt}\n\nContext from codebase:\n{context}\n\nDiff:\n{diff}"
         response = openAIClient.chat.completions.create(
             model="gpt-4o-mini",
@@ -95,45 +126,73 @@ async def review_diff(repo_name: str, diff: str):
                 {"role": "user", "content": diff}
             ]
         )
+        # 3. Return the code review comment
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error occurred during processing of message: {e}")
         return {"error": str(e)}
     
-async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3):
 
-    file_paths = extract_file_paths_from_diff(diff)
-    chunks = chunk_diff(diff)
-    all_matches = []
+### CALLED BY: review_diff
+### PURPOSE: Retrieves the context from the diff by searching the vector database for the most relevant chunks
+# 1. Retrieve the file paths from the diff
+# 2. Embed sizable chunks of the diff from chunk_diff()
+# 3. Query the vector database for the most relevant chunks to the diff
+# 4. Concatenate the most relevant chunks and return them
+# @param repo_name: str - The name of the repository to be searched for context
+# @param diff: str - The diff of the pull request
+# @param top_k: int - The number of chunks to concatenate and return
+# @return: str - concatenated string of context from the codebase
+async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3) -> str:
+    try:
+        # 1. Retrieve the file paths from the diff
+        file_paths = extract_file_paths_from_diff(diff)
 
-    for chunk in chunks:
-        response = openAIClient.embeddings.create(
-            input=chunk,
-            model="text-embedding-3-small"
-        )
-        vector = response.data[0].embedding
+        # 2. Embed sizable chunks of the diff from chunk_diff()
+        chunks = chunk_diff(diff)
+        all_matches = []
 
-        result = index.query(
-            vector=vector,
-            top_k=top_k,
-            include_metadata=True,
-            filter={"repo": {"$eq": repo_name},
-                    "path": {"$in": list(file_paths)}}  
-        )
+        # 3. Embed each chunk and query the vector database for the most relevant chunks to the diff
+        for chunk in chunks:
+            response = openAIClient.embeddings.create(
+                input=chunk,
+                model="text-embedding-3-small"
+            )
+            vector = response.data[0].embedding
 
-        for match in result.get("matches", []):
-            chunk_id = match["id"]
-            full_chunk = get_full_chunk_by_id(chunk_id, chunk_store)
+            result = index.query(
+                vector=vector,
+                top_k=top_k,
+                include_metadata=True,
+                filter={"repo": {"$eq": repo_name},
+                        "path": {"$in": list(file_paths)}}  
+            )
 
-            if full_chunk:
-                logger.info(f"✅ Context match from {match['metadata']['path']} (chunk {match['metadata']['chunk_id']})")
-                all_matches.append(full_chunk)
-            else:
-                logger.warning(f"⚠️ Chunk ID {chunk_id} not found in chunk store")
+            # 4. Append the most relevant chunks to the list
+            for match in result.get("matches", []):
+                chunk_id = match["id"]
+                full_chunk = get_full_chunk_by_id(chunk_id, chunk_store)
 
-    return "\n\n".join(all_matches[:5])
+                if full_chunk:
+                    # Log the location of the context match
+                    logger.info(f"✅ Context match from {match['metadata']['path']} (chunk {match['metadata']['chunk_id']})")
+                    all_matches.append(full_chunk)
+                else:
+                    logger.warning(f"⚠️ Chunk ID {chunk_id} not found in chunk store")
+
+        return "\n\n".join(all_matches[:3])
+    
+    except Exception as e:
+        logger.error(f"Error occurred during retrieval of context from diff: {e}")
+        return {"error": str(e)}
 
 
+### CALLED BY: retrieve_context_from_diff
+### PURPOSE: Extracts the file paths from the diff to be used as a filter for the context search
+# 1. Extract the file paths from the diff
+# 2. Append the file paths into a set, and return the set
+# @param diff: str - The diff of the pull request
+# @return: set[str] - The file paths from the diff
 def extract_file_paths_from_diff(diff: str) -> set[str]:
     paths = set()
     for line in diff.splitlines():
@@ -143,7 +202,15 @@ def extract_file_paths_from_diff(diff: str) -> set[str]:
     return paths 
 
 
-def chunk_diff(diff: str, min_len: int = 50):
+### CALLED BY: retrieve_context_from_diff
+### PURPOSE: Splits the entire diff into chunks, which, if longer than min_len, are added to the vector database
+# 1. Chunk the diff
+# 2. Measure the length of each chunk to check usefulness as an embedding
+# 3. Append the chunks into a list, and return the list
+# @param diff: str - The diff of the pull request
+# @param min_len: int - The minimum length of a chunk
+# @return: list[str] - The chunks of the diff
+def chunk_diff(diff: str, min_len: int = 50) -> list[str]:
 
     chunks = []
     raw_chunks = re.split(r"^diff --git.+?^(@@.+?@@)", diff, flags=re.MULTILINE | re.DOTALL)
@@ -154,7 +221,15 @@ def chunk_diff(diff: str, min_len: int = 50):
             chunks.append(cleaned)
     return chunks
 
-async def post_comment(issue_url: str, comment: str):
+
+### CALLED BY: process_review
+### PURPOSE: Posts the comment to the issue
+# 1. Post the comment to the issue
+# 2. Return a success message
+# @param issue_url: str - The URL of the issue
+# @param comment: str - The comment to be posted
+# @return: dict - The response from the API
+async def post_comment(issue_url: str, comment: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.post(issue_url+"/comments", json={"body": comment}, 
             headers={
