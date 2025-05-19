@@ -104,9 +104,18 @@ async def get_diff(url: str):
             return response.text
         else:
             return {"error": "Failed to get pull request diff"}
+        
+def extract_file_paths_from_diff(diff: str) -> set[str]:
+    paths = set()
+    for line in diff.splitlines():
+        match = re.match(r"^diff --git a/(.+?) b/", line)
+        if match:
+            paths.add(match.group(1))
+    return paths
 
 async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3):
 
+    file_paths = extract_file_paths_from_diff(diff)
     chunks = chunk_diff(diff)
     all_matches = []
 
@@ -121,7 +130,8 @@ async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3):
             vector=vector,
             top_k=top_k,
             include_metadata=True,
-            filter={"repo": {"$eq": repo_name}}  # ← filter by repo
+            filter={"repo": {"$eq": repo_name},
+                    "path": {"$in": list(file_paths)}}  
         )
 
         for match in result.get("matches", []):
