@@ -1,4 +1,4 @@
-from diff_functions import process_review
+from logic_functions.diff_functions import process_review
 from fastapi import FastAPI, Request, BackgroundTasks
 import asyncio
 import logging

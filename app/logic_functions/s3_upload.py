@@ -13,9 +13,9 @@ S3_OBJECT_KEY = "chunk_s3.json"
 
 s3 = boto3.client("s3")
 
-# ---------------------------
+# ----------------------------
 # Save locally & upload to S3
-# ---------------------------
+# ----------------------------
 
 def save_chunk_store_locally(chunks):
     store = {
@@ -37,9 +37,9 @@ def upload_chunk_store_to_s3():
     s3.upload_file(CHUNK_STORE_FILE, S3_BUCKET, S3_OBJECT_KEY)
     print(f"✅ Uploaded chunk store to s3://{S3_BUCKET}/{S3_OBJECT_KEY}")
 
-# ---------------------------
-# Download & Load in FastAPI
-# ---------------------------
+# -------------------------------------------------------
+# Download & Load in FastAPI (using macOS tmp directory)
+# -------------------------------------------------------
 
 def download_chunk_store_from_s3(dest_path="/tmp/chunk_store.json"):
     s3.download_file(S3_BUCKET, S3_OBJECT_KEY, dest_path)
