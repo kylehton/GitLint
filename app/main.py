@@ -105,7 +105,7 @@ async def get_diff(url: str):
         else:
             return {"error": "Failed to get pull request diff"}
 
-async def retrieve_context_from_diff(diff: str, top_k: int = 3):
+async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3):
 
     chunks = chunk_diff(diff)
     all_matches = []
@@ -120,7 +120,8 @@ async def retrieve_context_from_diff(diff: str, top_k: int = 3):
         result = index.query(
             vector=vector,
             top_k=top_k,
-            include_metadata=True
+            include_metadata=True,
+            filter={"repo": {"$eq": repo_name}}  # ← filter by repo
         )
 
         for match in result.get("matches", []):
@@ -152,7 +153,7 @@ def read_root():
     return {"Status": "200 OK"}
 
 # Process function for review endpoint
-async def process_review(diff_url: str, issue_url: str):
+async def process_review(repo_name: str, diff_url: str, issue_url: str):
     try:
         logger.info("[PROCESS]: Retrieving diff from redirect URL")
         diff = await get_diff(diff_url)
@@ -161,7 +162,7 @@ async def process_review(diff_url: str, issue_url: str):
             return
 
         logger.info("[PROCESS]: Reviewing diff and creating comment")
-        review = await review_diff(diff)
+        review = await review_diff(repo_name, diff)
         if isinstance(review, dict) and review.get("error"):
             logger.error(f"Error reviewing diff: {review['error']}")
             return
@@ -174,6 +175,9 @@ async def process_review(diff_url: str, issue_url: str):
     
 @app.post("/review")
 async def webhook(request: Request, background_tasks: BackgroundTasks):
+    full_repo = data["repository"]["full_name"]  
+    repo_name = full_repo.split("/")[-1]  
+
     logger.info("[/review] Request received")
 
     if request.headers.get("X-GitHub-Event") == "ping":
@@ -184,7 +188,7 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
         diff_url = data["pull_request"]["diff_url"]
         issue_url = data["pull_request"]["issue_url"]
         
-        background_tasks.add_task(process_review, diff_url, issue_url)
+        background_tasks.add_task(process_review, repo_name, diff_url, issue_url)
         
         logger.info("[/review] Responding immediately")
         

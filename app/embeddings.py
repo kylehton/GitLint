@@ -60,6 +60,8 @@ def chunk_code_files(repo_path: str, verbose=True):
                 code = file_path.read_text(encoding='utf-8', errors='ignore')
                 split_chunks = re.split(pattern, code)
 
+                repo_name = os.path.basename(repo_path)
+
                 for i, chunk in enumerate(split_chunks):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
@@ -71,6 +73,7 @@ def chunk_code_files(repo_path: str, verbose=True):
                                 "path": str(file_path),
                                 "chunk_id": i,
                                 "hash": content_hash,
+                                "repo": repo_name,
                                 "preview": cleaned[:200]
                             }
                         })
