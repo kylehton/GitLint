@@ -180,6 +180,9 @@ async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3) 
                 else:
                     logger.warning(f"⚠️ Chunk ID {chunk_id} not found in chunk store")
 
+        # TODO: Retrieve S3 embeddings that directly correspond to where the chunks are making changes to
+        # TODO: Create S3 function to re-upload relevant chunks with new changes made to them
+
         return "\n\n".join(all_matches[:3])
     
     except Exception as e:

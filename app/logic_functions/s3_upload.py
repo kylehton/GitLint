@@ -7,6 +7,7 @@ from pathlib import Path
 
 dotenv.load_dotenv()
 
+# const for local chunk storage to be placed in s3 bucket
 CHUNK_STORE_FILE = "chunk_s3.json"
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 S3_OBJECT_KEY = "chunk_s3.json"
@@ -37,9 +38,10 @@ def upload_chunk_store_to_s3():
     s3.upload_file(CHUNK_STORE_FILE, S3_BUCKET, S3_OBJECT_KEY)
     print(f"✅ Uploaded chunk store to s3://{S3_BUCKET}/{S3_OBJECT_KEY}")
 
-# -------------------------------------------------------
-# Download & Load in FastAPI (using macOS tmp directory)
-# -------------------------------------------------------
+# -----------------------------------------------------------------
+# Download & Load in FastAPI ('/tmp' directory)
+# serverless/containerized only allows writing to '/tmp' directory
+# -----------------------------------------------------------------
 
 def download_chunk_store_from_s3(dest_path="/tmp/chunk_store.json"):
     s3.download_file(S3_BUCKET, S3_OBJECT_KEY, dest_path)

@@ -100,7 +100,7 @@ def embed_chunks(chunks, existing_hashes):
 
     for chunk in tqdm(chunks):
         if chunk["metadata"]["hash"] in existing_hashes:
-            print(f"🟢 Skipping existing: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+            print(f"Skipping existing: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
             continue
 
         response = openAIClient.embeddings.create(
@@ -109,7 +109,7 @@ def embed_chunks(chunks, existing_hashes):
         )
         chunk["embedding"] = response.data[0].embedding
         embedded_chunks.append(chunk)
-        print(f"🔄 Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+        print(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
 
     return embedded_chunks
 
@@ -125,9 +125,9 @@ def upsert_to_pinecone(chunks, index):
 
     if vectors:
         index.upsert(vectors=vectors)
-        print(f"🧠 Upserted {len(vectors)} vectors.")
+        print(f"Upserted {len(vectors)} vectors.")
     else:
-        print("🟢 No new vectors to upsert.")
+        print("No new vectors to upsert.")
 
 if __name__ == "__main__":
     paths_to_repos = [
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         chunks = chunk_code_files(path)
         all_chunks.extend(chunks)
 
-    print(f"📊 Total chunks loaded: {len(all_chunks)}")
+    print(f"Total chunks loaded: {len(all_chunks)}")
 
     existing_hashes = set(load_hash_cache().keys())
 
