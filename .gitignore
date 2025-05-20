@@ -8,7 +8,7 @@ pyvenv.cfg
 
 /.venv/
 
-
+app/logic_functions/embeddings.py
 app/logic_functions/embedded_hashes.json
 app/logic_functions/chunk_s3.json
 app/script-tools/
