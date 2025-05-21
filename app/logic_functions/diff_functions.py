@@ -1,4 +1,5 @@
-from logic_functions.s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id
+from s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id, save_chunk_store_locally, upload_chunk_store_to_s3
+from embeddings import chunk_code_files, embed_chunks, upsert_to_pinecone
 
 from pinecone import Pinecone
 from openai import OpenAI
@@ -83,6 +84,12 @@ async def process_review(repo_name: str, diff_url: str, issue_url: str):
         # 3. Post the comment to the issue
         response = await post_comment(issue_url, review)
         logger.info(f"Comment response: {response}")
+
+        # 4. Update embeddings for modified files
+        if response.get("message") == "Comment posted successfully":
+            logger.info("[PROCESS]: Updating embeddings for modified files")
+            await update_file_embeddings(repo_name, diff)
+            logger.info("[PROCESS]: Successfully updated embeddings")
     except Exception as e:
         logger.error(f"[ERROR]: {e}")
 
@@ -244,3 +251,114 @@ async def post_comment(issue_url: str, comment: str) -> dict:
             return {"message": "Comment posted successfully"}
         else:
             return {"message": "Failed to post comment"}
+
+async def get_file_content(repo_name: str, file_path: str) -> str:
+    try:
+        url = f"https://raw.githubusercontent.com/{repo_name}/main/{file_path}"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                return response.text
+            else:
+                logger.error(f"Failed to get file content from {url}: {response.status_code}")
+                return None
+    except Exception as e:
+        logger.error(f"Error getting file content: {e}")
+        return None
+
+async def update_file_embeddings(repo_name: str, diff: str):
+    global chunk_store
+    
+    try:
+        # Get modified file paths from diff
+        file_paths = extract_file_paths_from_diff(diff)
+        if not file_paths:
+            logger.info("No files to update")
+            return
+
+        # Process each modified file
+        for file_path in file_paths:
+            # Get file content from GitHub
+            content = await get_file_content(repo_name, file_path)
+            if not content:
+                logger.warning(f"Could not get content for {file_path}")
+                continue
+
+            # Delete existing chunks for this file
+            chunks_to_delete = []
+            for chunk_id, chunk_data in chunk_store.items():
+                if chunk_data.get("path") == file_path:
+                    chunks_to_delete.append(chunk_id)
+            
+            if chunks_to_delete:
+                try:
+                    # Delete from Pinecone
+                    index.delete(ids=chunks_to_delete)
+                    # Remove from store
+                    for chunk_id in chunks_to_delete:
+                        chunk_store.pop(chunk_id, None)
+                    logger.info(f"Deleted {len(chunks_to_delete)} chunks for {file_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting chunks for {file_path}: {e}")
+
+            # Create chunks from file content
+            chunks = []
+            # Use the same chunking patterns as in embeddings.py
+            patterns = {
+                ".py": r"(?=def |class )",
+                ".js": r"(?=function |class |const |let |var )",
+                ".java": r"(?=public |private |protected |class )",
+            }
+            
+            ext = os.path.splitext(file_path)[1]
+            if ext in patterns:
+                split_chunks = re.split(patterns[ext], content)
+                for i, chunk in enumerate(split_chunks):
+                    cleaned = chunk.strip()
+                    if len(cleaned) > 50:
+                        chunks.append({
+                            "id": f"{file_path}-{i}",
+                            "text": cleaned,
+                            "metadata": {
+                                "path": file_path,
+                                "chunk_id": i,
+                                "repo": repo_name,
+                                "preview": cleaned[:200]
+                            }
+                        })
+
+            if not chunks:
+                logger.warning(f"No chunks created for {file_path}")
+                continue
+
+            # Embed the chunks
+            embedded_chunks = []
+            for chunk in chunks:
+                response = openAIClient.embeddings.create(
+                    input=chunk["text"],
+                    model="text-embedding-3-small"
+                )
+                chunk["embedding"] = response.data[0].embedding
+                embedded_chunks.append(chunk)
+                logger.info(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+
+            # Update Pinecone using the imported function
+            upsert_to_pinecone(embedded_chunks, index)
+            
+            # Update local store
+            for chunk in embedded_chunks:
+                chunk_store[chunk["id"]] = {
+                    "text": chunk["text"],
+                    "path": chunk["metadata"]["path"],
+                    "chunk_id": chunk["metadata"]["chunk_id"]
+                }
+
+        # Save updated store
+        save_chunk_store_locally(chunk_store)
+        upload_chunk_store_to_s3()
+        
+        logger.info(f"Successfully updated embeddings for {len(file_paths)} files")
+        
+    except Exception as e:
+        logger.error(f"Error updating file embeddings: {e}")
+        raise
