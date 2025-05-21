@@ -32,7 +32,7 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
     if request.headers.get("X-GitHub-Event") == "ping":
         logger.info("[/review] Ping received")
         return {"message": "Ping received!"}
-    elif request.headers.get("X-GitHub-Event") == "pull_request_opened":
+    elif request.headers.get("X-GitHub-Event") == "pull_request":
         data = await request.json()
         full_repo = data["repository"]["full_name"]  
         repo_name = full_repo.split("/")[-1] # Parse repo name for custom filter search
