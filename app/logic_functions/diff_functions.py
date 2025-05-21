@@ -155,6 +155,7 @@ async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3) 
         # 1. Retrieve the file paths from the diff
         file_paths = extract_file_paths_from_diff(diff)
 
+
         # 2. Embed sizable chunks of the diff from chunk_diff()
         chunks = chunk_diff(diff)
         all_matches = []
@@ -324,10 +325,11 @@ async def update_file_embeddings(repo_name: str, diff: str):
                         # Use relative path for both id and metadata
                         #chunk_id = f"{file_path} (chunk {i}.0)"
                         chunks.append({
+                            #"id": chunk_id,
                             "id": f"{file_path}-{i}-{content_hash}",
                             "text": cleaned,
                             "metadata": {
-                                "path": file_path,  # Already relative from extract_file_paths_from_diff
+                                "path": file_path, 
                                 "chunk_id": i,
                                 "hash": content_hash,
                                 "repo": repo_name,

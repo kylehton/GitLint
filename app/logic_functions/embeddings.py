@@ -61,16 +61,17 @@ def chunk_code_files(repo_path: str, verbose=True):
                 split_chunks = re.split(pattern, code)
 
                 repo_name = os.path.basename(repo_path)
+                relative_path = str(file_path.relative_to(repo_path))
 
                 for i, chunk in enumerate(split_chunks):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
                         chunks.append({
-                            "id": f"{file_path}-{i}-{content_hash}",
+                            "id": f"{relative_path}-{i}-{content_hash}",
                             "text": cleaned,
                             "metadata": {
-                                "path": str(file_path.relative_to(repo_path)),
+                                "path": relative_path,
                                 "chunk_id": i,
                                 "hash": content_hash,
                                 "repo": repo_name,
