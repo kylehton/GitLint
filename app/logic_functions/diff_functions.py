@@ -256,11 +256,13 @@ async def get_file_content(repo_name: str, file_path: str) -> str:
     try:
         url = f"https://raw.githubusercontent.com/kylehton/{repo_name}/main/{file_path}"
         async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            if response.status_code == 200:
-                return response.text
+            response = httpx.get(url)
+
+            if response.status_code == 200 or response.status_code == 302:
+                file_content = response.text
+                # proceed to use file_content
             else:
-                logger.error(f"Failed to get file content from {url}: {response.status_code}")
+                logger.warning(f"Failed to get file from {url}: {response.status_code}")
                 return None
     except Exception as e:
         logger.error(f"Error getting file content: {e}")
