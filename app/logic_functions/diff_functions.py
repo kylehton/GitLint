@@ -320,7 +320,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
                         # Use the same ID format as embeddings.py
                         content_hash = hash_content(cleaned)
                         chunks.append({
-                            "id": f"{file_path} (chunk {i}.0)-{content_hash}",
+                            "id": f"{file_path} (chunk {i}.0)",
                             "text": cleaned,
                             "metadata": {
                                 "path": file_path,

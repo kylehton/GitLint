@@ -70,7 +70,7 @@ def chunk_code_files(repo_path: str, verbose=True):
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
                         chunks.append({
-                            "id": f"{file_path} (chunk {i}.0)-{content_hash}",
+                            "id": f"{file_path} (chunk {i}.0)",
                             "text": cleaned,
                             "metadata": {
                                 "path": str(file_path.relative_to(repo_path)),
