@@ -322,9 +322,9 @@ async def update_file_embeddings(repo_name: str, diff: str):
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
                         # Use relative path for both id and metadata
-                        chunk_id = f"{file_path} (chunk {i}.0)"
+                        #chunk_id = f"{file_path} (chunk {i}.0)"
                         chunks.append({
-                            "id": chunk_id,
+                            "id": f"{file_path}-{i}-{content_hash}",
                             "text": cleaned,
                             "metadata": {
                                 "path": file_path,  # Already relative from extract_file_paths_from_diff
