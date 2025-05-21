@@ -323,9 +323,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
                         # Use relative path for both id and metadata
-                        #chunk_id = f"{file_path} (chunk {i}.0)"
                         chunks.append({
-                            #"id": chunk_id,
                             "id": f"{file_path}-{i}-{content_hash}",
                             "text": cleaned,
                             "metadata": {
@@ -346,7 +344,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
             for chunk in chunks:
                 try:
                     response = openAIClient.embeddings.create(
-                        input=chunk["text"],
+                        input=chunk["preview"],
                         model="text-embedding-3-small"
                     )
                     chunk["embedding"] = response.data[0].embedding
@@ -374,7 +372,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
             for chunk in embedded_chunks:
                 try:
                     chunk_store[chunk["id"]] = {
-                        "text": chunk["text"],
+                        "preview": chunk["preview"],
                         "path": chunk["metadata"]["path"],  # Use the same relative path
                         "chunk_id": chunk["metadata"]["chunk_id"]
                     }
