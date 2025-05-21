@@ -1,5 +1,5 @@
 from logic_functions.s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id, save_chunk_store_locally, upload_chunk_store_to_s3
-from logic_functions.embeddings import chunk_code_files, embed_chunks, upsert_to_pinecone
+from logic_functions.embeddings import chunk_code_files, embed_chunks, upsert_to_pinecone, hash_content
 
 from pinecone import Pinecone
 from openai import OpenAI
@@ -255,12 +255,11 @@ async def post_comment(issue_url: str, comment: str) -> dict:
 async def get_file_content(repo_name: str, file_path: str) -> str:
     try:
         url = f"https://raw.githubusercontent.com/kylehton/{repo_name}/main/{file_path}"
+        
         async with httpx.AsyncClient() as client:
-            response = httpx.get(url)
-
-            if response.status_code == 200 or response.status_code == 302:
-                file_content = response.text
-                # proceed to use file_content
+            response = await client.get(url)
+            if response.status_code == 200:
+                return response.text
             else:
                 logger.warning(f"Failed to get file from {url}: {response.status_code}")
                 return None
@@ -318,12 +317,15 @@ async def update_file_embeddings(repo_name: str, diff: str):
                 for i, chunk in enumerate(split_chunks):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
+                        # Use the same ID format as embeddings.py
+                        content_hash = hash_content(cleaned)
                         chunks.append({
-                            "id": f"{file_path} (chunk {i}.0)", 
+                            "id": f"{file_path} (chunk {i}.0)-{content_hash}",
                             "text": cleaned,
                             "metadata": {
                                 "path": file_path,
                                 "chunk_id": i,
+                                "hash": content_hash,
                                 "repo": repo_name,
                                 "preview": cleaned[:200]
                             }
