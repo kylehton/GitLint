@@ -319,7 +319,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
                         chunks.append({
-                            "id": f"{file_path}-{i}",
+                            "id": f"{file_path} (chunk {i}.0)", 
                             "text": cleaned,
                             "metadata": {
                                 "path": file_path,
