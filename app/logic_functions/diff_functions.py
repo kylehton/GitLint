@@ -317,13 +317,13 @@ async def update_file_embeddings(repo_name: str, diff: str):
                 for i, chunk in enumerate(split_chunks):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
-                        # Use the same ID format as embeddings.py
                         content_hash = hash_content(cleaned)
+                        # Match exactly with embeddings.py format
                         chunks.append({
-                            "id": f"{file_path} (chunk {i}.0)",
+                            "id": f"{file_path} (chunk {i}.0)",  # Exact same format as embeddings.py
                             "text": cleaned,
                             "metadata": {
-                                "path": file_path,
+                                "path": file_path,  # Use relative path like embeddings.py
                                 "chunk_id": i,
                                 "hash": content_hash,
                                 "repo": repo_name,
@@ -338,38 +338,49 @@ async def update_file_embeddings(repo_name: str, diff: str):
             # Embed the chunks
             embedded_chunks = []
             for chunk in chunks:
-                response = openAIClient.embeddings.create(
-                    input=chunk["text"],
-                    model="text-embedding-3-small"
-                )
-                chunk["embedding"] = response.data[0].embedding
-                embedded_chunks.append(chunk)
-                logger.info(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+                try:
+                    response = openAIClient.embeddings.create(
+                        input=chunk["text"],
+                        model="text-embedding-3-small"
+                    )
+                    chunk["embedding"] = response.data[0].embedding
+                    embedded_chunks.append(chunk)
+                    logger.info(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+                except Exception as e:
+                    logger.error(f"Error embedding chunk {chunk['id']}: {e}")
+                    continue
 
-            # pre-check the chunks before local upsert
-            for i, chunk in enumerate(embedded_chunks):
-                if not isinstance(chunk, dict):
-                    logger.error(f"❌ embedded_chunks[{i}] is not a dict: {chunk}")
-                elif "metadata" not in chunk or "text" not in chunk:
-                    logger.error(f"❌ embedded_chunks[{i}] missing keys: {chunk.keys()}")
+            if not embedded_chunks:
+                logger.warning(f"No chunks were successfully embedded for {file_path}")
+                continue
 
-            # upsert the chunks to pinecone
-            upsert_to_pinecone(embedded_chunks, index)
-
+            # Update Pinecone using the imported function
+            try:
+                upsert_to_pinecone(embedded_chunks, index)
+            except Exception as e:
+                logger.error(f"Error upserting to Pinecone: {e}")
+                continue
             
             # Update local store
             for chunk in embedded_chunks:
-                chunk_store[chunk["id"]] = {
-                    "text": chunk["text"],
-                    "path": chunk["metadata"]["path"],
-                    "chunk_id": chunk["metadata"]["chunk_id"]
-                }
+                try:
+                    chunk_store[chunk["id"]] = {
+                        "text": chunk["text"],
+                        "path": chunk["metadata"]["path"],
+                        "chunk_id": chunk["metadata"]["chunk_id"]
+                    }
+                except Exception as e:
+                    logger.error(f"Error updating store for chunk {chunk['id']}: {e}")
+                    continue
 
         # Save updated store
-        save_chunk_store_locally(chunk_store)
-        upload_chunk_store_to_s3()
-        
-        logger.info(f"Successfully updated embeddings for {len(file_paths)} files")
+        try:
+            save_chunk_store_locally(chunk_store)
+            upload_chunk_store_to_s3()
+            logger.info(f"Successfully updated embeddings for {len(file_paths)} files")
+        except Exception as e:
+            logger.error(f"Error saving store: {e}")
+            raise
         
     except Exception as e:
         logger.error(f"Error updating file embeddings: {e}")
