@@ -277,6 +277,9 @@ async def update_file_embeddings(repo_name: str, diff: str):
             logger.info("No files to update")
             return
 
+        # Track all embedded chunks for saving
+        all_embedded_chunks = []
+
         # Process each modified file
         for file_path in file_paths:
             # Get file content from GitHub
@@ -318,12 +321,13 @@ async def update_file_embeddings(repo_name: str, diff: str):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
-                        # Match exactly with embeddings.py format
+                        # Use relative path for both id and metadata
+                        chunk_id = f"{file_path} (chunk {i}.0)"
                         chunks.append({
-                            "id": f"{file_path} (chunk {i}.0)",  # Exact same format as embeddings.py
+                            "id": chunk_id,
                             "text": cleaned,
                             "metadata": {
-                                "path": file_path,  # Use relative path like embeddings.py
+                                "path": file_path,  # Already relative from extract_file_paths_from_diff
                                 "chunk_id": i,
                                 "hash": content_hash,
                                 "repo": repo_name,
@@ -361,21 +365,24 @@ async def update_file_embeddings(repo_name: str, diff: str):
                 logger.error(f"Error upserting to Pinecone: {e}")
                 continue
             
-            # Update local store
+            # Add to our list of all embedded chunks
+            all_embedded_chunks.extend(embedded_chunks)
+            
+            # Update local store with consistent paths
             for chunk in embedded_chunks:
                 try:
                     chunk_store[chunk["id"]] = {
                         "text": chunk["text"],
-                        "path": chunk["metadata"]["path"],
+                        "path": chunk["metadata"]["path"],  # Use the same relative path
                         "chunk_id": chunk["metadata"]["chunk_id"]
                     }
                 except Exception as e:
                     logger.error(f"Error updating store for chunk {chunk['id']}: {e}")
                     continue
 
-        # Save updated store
+        # Save updated store using the same format as embeddings.py
         try:
-            save_chunk_store_locally(chunk_store)
+            save_chunk_store_locally(all_embedded_chunks)
             upload_chunk_store_to_s3()
             logger.info(f"Successfully updated embeddings for {len(file_paths)} files")
         except Exception as e:

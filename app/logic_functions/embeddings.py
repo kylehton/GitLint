@@ -1,6 +1,6 @@
 # THIS FILE IS MEANT TO CREATE INITIAL EMBEDDINGS FOR THE REPOSITORIES THAT ARE WATCHED BY THE GIT LINT SERVICE
 # IT IS MEANT TO BE RUN ONCE AND THEN THE EMBEDDINGS WILL BE STORED IN PINECONE
-from logic_functions.s3_upload import save_chunk_store_locally, upload_chunk_store_to_s3
+from s3_upload import save_chunk_store_locally, upload_chunk_store_to_s3
 import os
 import re
 import json
@@ -8,12 +8,9 @@ import dotenv
 from pathlib import Path
 from tqdm import tqdm
 from hashlib import sha256
-import logging
+
 from pinecone import Pinecone
 from openai import OpenAI
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 dotenv.load_dotenv()
 
@@ -55,7 +52,7 @@ def chunk_code_files(repo_path: str, verbose=True):
         for file_path in Path(repo_path).rglob(f"*{ext}"):
             if any(part in EXCLUDED_DIRS for part in file_path.parts):
                 if verbose:
-                    logger.info(f"❌ Skipping (excluded dir): {file_path}")
+                    print(f"❌ Skipping (excluded dir): {file_path}")
                 skipped_files += 1
                 continue
 
@@ -70,7 +67,7 @@ def chunk_code_files(repo_path: str, verbose=True):
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
                         chunks.append({
-                            "id": f"{file_path} (chunk {i}.0)",
+                            "id": f"{file_path}-{i}-{content_hash}",
                             "text": cleaned,
                             "metadata": {
                                 "path": str(file_path.relative_to(repo_path)),
@@ -82,19 +79,19 @@ def chunk_code_files(repo_path: str, verbose=True):
                         })
 
                 if verbose:
-                    logger.info(f"✅ Processed: {file_path}")
+                    print(f"✅ Processed: {file_path}")
                 processed_files += 1
 
             except Exception as e:
                 if verbose:
-                    logger.info(f"⚠️ Error reading {file_path}: {e}")
+                    print(f"⚠️ Error reading {file_path}: {e}")
                 continue
 
     if verbose:
-        logger.info(f"\nFinished processing.")
-        logger.info(f"--Chunks created: {len(chunks)}")
-        logger.info(f"--Files processed: {processed_files}")
-        logger.info(f"--Files skipped: {skipped_files}")
+        print(f"\nFinished processing.")
+        print(f"--Chunks created: {len(chunks)}")
+        print(f"--Files processed: {processed_files}")
+        print(f"--Files skipped: {skipped_files}")
 
     return chunks
 
@@ -103,7 +100,7 @@ def embed_chunks(chunks, existing_hashes):
 
     for chunk in tqdm(chunks):
         if chunk["metadata"]["hash"] in existing_hashes:
-            logger.info(f"Skipping existing: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+            print(f"Skipping existing: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
             continue
 
         response = openAIClient.embeddings.create(
@@ -112,7 +109,7 @@ def embed_chunks(chunks, existing_hashes):
         )
         chunk["embedding"] = response.data[0].embedding
         embedded_chunks.append(chunk)
-        logger.info(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
+        print(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
 
     return embedded_chunks
 
@@ -128,9 +125,9 @@ def upsert_to_pinecone(chunks, index):
 
     if vectors:
         index.upsert(vectors=vectors)
-        logger.info(f"Upserted {len(vectors)} vectors.")
+        print(f"Upserted {len(vectors)} vectors.")
     else:
-        logger.info("No new vectors to upsert.")
+        print("No new vectors to upsert.")
 
 if __name__ == "__main__":
     paths_to_repos = [
@@ -144,7 +141,7 @@ if __name__ == "__main__":
         chunks = chunk_code_files(path)
         all_chunks.extend(chunks)
 
-    logger.info(f"Total chunks loaded: {len(all_chunks)}")
+    print(f"Total chunks loaded: {len(all_chunks)}")
 
     existing_hashes = set(load_hash_cache().keys())
 
