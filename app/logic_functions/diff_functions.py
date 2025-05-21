@@ -254,7 +254,7 @@ async def post_comment(issue_url: str, comment: str) -> dict:
 
 async def get_file_content(repo_name: str, file_path: str) -> str:
     try:
-        url = f"https://raw.githubusercontent.com/{repo_name}/main/{file_path}"
+        url = f"https://raw.githubusercontent.com/kylehton/{repo_name}/main/{file_path}"
         async with httpx.AsyncClient() as client:
             response = await client.get(url)
             if response.status_code == 200:
