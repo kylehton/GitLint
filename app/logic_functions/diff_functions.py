@@ -346,8 +346,16 @@ async def update_file_embeddings(repo_name: str, diff: str):
                 embedded_chunks.append(chunk)
                 logger.info(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
 
-            # Update Pinecone using the imported function
+            # pre-check the chunks before local upsert
+            for i, chunk in enumerate(embedded_chunks):
+                if not isinstance(chunk, dict):
+                    logger.error(f"❌ embedded_chunks[{i}] is not a dict: {chunk}")
+                elif "metadata" not in chunk or "text" not in chunk:
+                    logger.error(f"❌ embedded_chunks[{i}] missing keys: {chunk.keys()}")
+
+            # upsert the chunks to pinecone
             upsert_to_pinecone(embedded_chunks, index)
+
             
             # Update local store
             for chunk in embedded_chunks:
