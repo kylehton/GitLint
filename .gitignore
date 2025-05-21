@@ -8,6 +8,6 @@ pyvenv.cfg
 
 /.venv/
 
-app/logic_functions/embedded_hashes.json
-app/logic_functions/chunk_s3.json
+embedded_hashes.json
+chunk_s3.json
 app/script-tools/
