@@ -1,6 +1,6 @@
 # THIS FILE IS MEANT TO CREATE INITIAL EMBEDDINGS FOR THE REPOSITORIES THAT ARE WATCHED BY THE GIT LINT SERVICE
 # IT IS MEANT TO BE RUN ONCE AND THEN THE EMBEDDINGS WILL BE STORED IN PINECONE
-from s3_upload import save_chunk_store_locally, upload_chunk_store_to_s3
+from logic_functions.s3_upload import save_chunk_store_locally, upload_chunk_store_to_s3
 import os
 import re
 import json
