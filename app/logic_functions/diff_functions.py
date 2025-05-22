@@ -344,7 +344,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
             for chunk in chunks:
                 try:
                     response = openAIClient.embeddings.create(
-                        input=chunk["preview"],
+                        input=chunk["text"],
                         model="text-embedding-3-small"
                     )
                     chunk["embedding"] = response.data[0].embedding
