@@ -1,6 +1,6 @@
 # THIS FILE IS MEANT TO CREATE INITIAL EMBEDDINGS FOR THE REPOSITORIES THAT ARE WATCHED BY THE GIT LINT SERVICE
 # IT IS MEANT TO BE RUN ONCE AND THEN THE EMBEDDINGS WILL BE STORED IN PINECONE
-from logic_functions.s3_upload import save_chunk_store_locally, upload_chunk_store_to_s3
+from app.logic_functions.s3_upload import save_chunk_store_locally, upload_chunk_store_to_s3
 import os
 import re
 import json
@@ -61,17 +61,16 @@ def chunk_code_files(repo_path: str, verbose=True):
                 split_chunks = re.split(pattern, code)
 
                 repo_name = os.path.basename(repo_path)
-                relative_path = str(file_path.relative_to(repo_path))
 
                 for i, chunk in enumerate(split_chunks):
                     cleaned = chunk.strip()
                     if len(cleaned) > 50:
                         content_hash = hash_content(cleaned)
                         chunks.append({
-                            "id": f"{relative_path}-{i}-{content_hash}",
+                            "id": f"{file_path}-{i}-{content_hash}",
                             "text": cleaned,
                             "metadata": {
-                                "path": relative_path,
+                                "path": str(file_path.relative_to(repo_path)),
                                 "chunk_id": i,
                                 "hash": content_hash,
                                 "repo": repo_name,

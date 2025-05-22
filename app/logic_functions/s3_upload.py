@@ -53,4 +53,4 @@ def load_chunk_store(path="/tmp/chunk_store.json"):
         return json.load(f)
 
 def get_full_chunk_by_id(chunk_id, store):
-    return store.get(chunk_id, {}).get("preview", "")
+    return store.get(chunk_id, {}).get("text", "")
