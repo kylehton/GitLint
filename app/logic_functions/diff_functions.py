@@ -324,10 +324,10 @@ async def update_file_embeddings(repo_name: str, diff: str):
                         content_hash = hash_content(cleaned)
                         # Use relative path for both id and metadata
                         chunks.append({
-                            "id": f"{file_path}-{i}-{content_hash}",
+                            "id": f"{file_path}-{i}-{content_hash}",  # Use relative path
                             "text": cleaned,
                             "metadata": {
-                                "path": file_path, 
+                                "path": file_path,  # Use relative path
                                 "chunk_id": i,
                                 "hash": content_hash,
                                 "repo": repo_name,
@@ -372,8 +372,8 @@ async def update_file_embeddings(repo_name: str, diff: str):
             for chunk in embedded_chunks:
                 try:
                     chunk_store[chunk["id"]] = {
-                        "preview": chunk["preview"],
-                        "path": chunk["metadata"]["path"],  # Use the same relative path
+                        "text": chunk["text"],
+                        "path": chunk["metadata"]["path"],
                         "chunk_id": chunk["metadata"]["chunk_id"]
                     }
                 except Exception as e:
