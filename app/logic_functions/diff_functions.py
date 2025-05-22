@@ -351,7 +351,7 @@ async def update_file_embeddings(repo_name: str, diff: str):
                     embedded_chunks.append(chunk)
                     logger.info(f"Embedded: {chunk['metadata']['path']} [chunk {chunk['metadata']['chunk_id']}]")
                     logger.info(f"Hash: {chunk['metadata']['hash']}")
-                    logger.info(f"Preview: {chunk['metadata']['text']}")
+                    logger.info(f"Preview: {chunk['text']}")
                 except Exception as e:
                     logger.error(f"Error embedding chunk {chunk['id']}: {e}")
                     continue
