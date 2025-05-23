@@ -1,7 +1,6 @@
-# TODO: Abstract as much as possible, especially in update embeddings function
 
-from logic_functions.s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id, save_chunk_store_locally, upload_chunk_store_to_s3
-from logic_functions.embeddings import upsert_to_pinecone, hash_content
+from logic.s3_upload import download_chunk_store_from_s3, load_chunk_store, get_full_chunk_by_id, save_chunk_store_locally, upload_chunk_store_to_s3
+from logic.embeddings import upsert_to_pinecone, hash_content
 
 from pinecone import Pinecone
 from openai import OpenAI
@@ -94,7 +93,6 @@ async def process_review(repo_name: str, diff_url: str, issue_url: str):
             logger.info("[PROCESS]: Successfully updated embeddings")
     except Exception as e:
         logger.error(f"[ERROR]: {e}")
-
 
 ### CALLED BY: process_review
 ### PURPOSE: Retrieves the diff from the redirect URL to be used as the input for the review
@@ -190,9 +188,6 @@ async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3) 
                 else:
                     logger.warning(f"⚠️ Chunk ID {chunk_id} not found in chunk store")
 
-        # TODO: Retrieve S3 embeddings that directly correspond to where the chunks are making changes to
-        # TODO: Create S3 function to re-upload relevant chunks with new changes made to them
-
         return "\n\n".join(all_matches[:3])
     
     except Exception as e:
@@ -206,13 +201,19 @@ async def retrieve_context_from_diff(repo_name: str, diff: str, top_k: int = 3) 
 # 2. Append the file paths into a set, and return the set
 # @param diff: str - The diff of the pull request
 # @return: set[str] - The file paths from the diff
-def extract_file_paths_from_diff(diff: str) -> set[str]:
+def extract_file_paths_from_diff(diff: str) -> list[str]:
     paths = set()
+
     for line in diff.splitlines():
-        match = re.match(r"^diff --git a/(.+?) b/", line)
-        if match:
-            paths.add(match.group(1))
-    return paths 
+        if line.startswith("diff --git"):
+            match = re.search(r"diff --git a/(.*?) b/(.*)", line)
+            if match:
+                paths.add(match.group(2))  # destination path
+        elif line.startswith("+++ b/"):
+            paths.add(line.replace("+++ b/", "").strip())
+    
+    return list(paths)
+
 
 
 ### CALLED BY: retrieve_context_from_diff

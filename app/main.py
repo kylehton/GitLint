@@ -11,7 +11,7 @@ background_tasks_set = set()
 
 ### FASTAPI ENDPOINTS ###
 
-@app.on_event("shutdown")
+@app.lifespan("shutdown")
 async def shutdown_event():
     logger.info("Application shutting down...")
     # Wait for all background tasks to complete
